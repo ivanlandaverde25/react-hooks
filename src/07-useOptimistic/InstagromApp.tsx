@@ -1,4 +1,5 @@
-import { useOptimistic, useState } from 'react';
+import { useOptimistic, useState, useTransition } from 'react';
+import { toast } from 'sonner'
 
 interface Comment {
   id: number;
@@ -9,41 +10,58 @@ interface Comment {
 let lastId = 2;
 
 export const InstagromApp = () => {
+
+  const [ ispPending, startTransition ] = useTransition();
+
   const [comments, setComments] = useState<Comment[]>([
       { id: 1, text: '¡Gran foto!' },
       { id: 2, text: 'Me encanta 🧡' },
-]);
+  ]);
 
-const [ optimisticComments, addOptimisticComment ] = useOptimistic(comments, 
-  (currentComments, newCommentText: string) => {
-    
-    lastId++;
-    
-    return [...currentComments,
-      {
-      id: lastId,
-      text: newCommentText,
-      optimistic: true
-      }
-    ];
-});
+  const [ optimisticComments, addOptimisticComment ] = useOptimistic(comments, 
+    (currentComments, newCommentText: string) => {
+      lastId++;
+      
+      return [...currentComments,
+        {
+        id: lastId,
+        text: newCommentText,
+        optimistic: true
+        }
+      ];
+  });
 
   const handleAddComment = async ( formData: FormData ) => {
     const messagePost = formData.get('post-message') as string;
     
     addOptimisticComment(messagePost);
     
-    // Simula la petición al servidor
-    await new Promise((resolve => {
-        setTimeout(resolve, 3000);
-    }));
+    // Comienza la transaccion de almacenar el comentario
+    startTransition( async () => {
 
-    setComments((prev) => [...prev, {
-        id: new Date().getTime(),
-        text: messagePost
-    }]);
+        // Simula la petición al servidor
+        await new Promise((resolve => {
+            setTimeout(resolve, 3000);
+        }));
+    
+        // setComments((prev) => [...prev, {
+        //     id: new Date().getTime(),
+        //     text: messagePost
+        // }]);
+    
+        toast('Error al agregar el comentario', {
+          description: 'Intente nuevamente',
+          duration: 10_000,
+          position: 'top-right',
+          action: {
+            label: 'Cerrar',
+            onClick: () => toast.dismiss()
+          }
+        });
 
-    console.log('Mensaje grabajo');
+        // !Codigo para revertir las acciones
+        setComments((prev) => prev);
+    });
   };
 
   return (
@@ -89,7 +107,7 @@ const [ optimisticComments, addOptimisticComment ] = useOptimistic(comments,
         />
         <button
           type="submit"
-          disabled={false}
+          disabled={ispPending}
           className="bg-blue-500 text-white p-2 rounded-md w-full"
         >
           Enviar
